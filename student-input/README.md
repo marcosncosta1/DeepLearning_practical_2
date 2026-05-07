@@ -40,3 +40,6 @@ uv sync
 - Operator nodes push values forward as soon as all required inputs are ready.
 - Binary operator nodes (`MultiplyNode`) expose a `get_parent_values()` helper that returns parent scalars in a fixed, named order, keeping `forward()` and `backward()` free of raw index accesses.
 - `CompGraph.backward()` starts from each output with upstream gradient `1.0`.
+
+
+-
