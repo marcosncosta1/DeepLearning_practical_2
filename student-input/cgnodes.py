@@ -354,11 +354,16 @@ class SquareNode(MetaNode):
 
 # ######  TO DO  #########
 class MSELossNode(MetaNode):
-    """A mean squared error loss node: J = 0.5 * (y_hat - y)^2
-    It takes two inputs: y_hat (prediction) and y (target).
-    """
+    """A mean squared error loss node: J = 0.5 * (y_hat - y)^2"""
 
     def __init__(self, y_hat: ValueNode, y: ValueNode, out: ValueNode):
+        """Create an MSE loss operator node.
+
+        Args:
+            y_hat: Predicted value node.
+            y: True value node.
+            out: Output node receiving the MSE loss.
+        """
         super().__init__()
         # parents[0] is always y_hat, parents[1] is always y
         y_hat.connect_to(self)
@@ -367,32 +372,44 @@ class MSELossNode(MetaNode):
         self._received_count = 0
 
     def get_parent_values(self) -> tuple[float, float]:
+        """Return parent values in the fixed ``(y_hat, y)`` order."""
         return self.parents[0].v, self.parents[1].v
 
     def receive_parent_value(self, v: float):
-        del v
+        """Record input arrival from a parent.
+
+        The scalar itself is not stored here because it is read from parent
+        nodes during forward/backward; only readiness state is tracked.
+        """
+        del v # value is read from parents[].v in forward/backward
         if self._received_count >= 2:
-            raise Exception("This node accepts 2 inputs that are already filled")
+            raise Exception(
+                "This node accepts 2 inputs that are already filled"
+            )
         self._received_count += 1
         if self._received_count == 2:
             self.input_ready = True
 
     def reset_values(self):
+        """Reset readiness counters and recursively reset descendants."""
         self._received_count = 0
         self.input_ready = False
         for node in self.children:
             node.reset_values()
 
     def forward(self):
+        """Compute MSE and push to children once both inputs are ready."""
         if self.input_ready:
             y_hat_val, y_val = self.get_parent_values()
-            z = 0.5 * (y_hat_val - y_val)**2
+            z = 0.5 * (y_hat_val - y_val) ** 2
             for node in self.children:
                 node.receive_parent_value(z)
                 node.forward()
 
     def backward(self, grad_z):
+        """Apply derivative of MSE and route gradients to both parents."""
         y_hat_val, y_val = self.get_parent_values()
-        diff = y_hat_val - y_val
-        self.parents[0].backward(grad_z * diff)
-        self.parents[1].backward(grad_z * (-diff))
+        grad_y_hat = grad_z * (y_hat_val - y_val)
+        grad_y = grad_z * (y_val - y_hat_val)
+        self.parents[0].backward(grad_y_hat)
+        self.parents[1].backward(grad_y)
